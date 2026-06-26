@@ -37,6 +37,47 @@ Cada imagem é redimensionada para 256×256 pixels e submetida a um pipeline de 
 
 Os histogramas são normalizados (L1) para invariância de escala. As features passam por `StandardScaler` antes do treinamento, removendo vieses de escala entre descritores.
 
+### Detalhes de Cada Descritor
+
+**HSV Hue (180 features)**
+- **O quê:** Histograma de matiz (cor pura) em escala HSV
+- **Como funciona:** Divide o círculo de cores em 180 faixas. Cada bin conta quantos pixels da nota correspondem a cada tonalidade
+- **Por quê:** As cédulas brasileiras têm cores muito distintas (verde R$2, azul R$5, vermelha R$10, etc.). Essa cor é o diferenciador principal
+- **Máscara de confiança:** Ignora pixels muito claros/escuros para evitar ruído de iluminação
+
+**HSV Saturação e Valor (64 features)**
+- **O quê:** Dois histogramas separados (32 bins cada)
+- **Como funciona:** 
+  - Saturação: quanto de "cor pura" vs cinza (0=cinza, 255=cor vibrante)
+  - Valor: brilho/luminosidade (0=preto, 255=branco)
+- **Por quê:** Captura intensidade de cor e luminosidade, ajudando a distinguir notas mesmo sob iluminações diferentes
+
+**Transformada de Hough Lines (5 features)**
+- **O quê:** Detecta linhas retas na imagem
+- **Como funciona:** 
+  1. Aplica Canny para detectar bordas
+  2. Transforma cada borda em espaço de Hough (ρ, θ)
+  3. Extrai estatísticas: número de linhas, ângulos, distâncias
+- **Por quê:** Cédulas têm bordas bem definidas e padrões geométricos. Linhas caracterizam essa estrutura
+- **5 features extraídas:** contagem de linhas, ângulo médio, desvio padrão de ângulos, distância média, desvio padrão de distâncias
+
+**Local Binary Patterns (59 features)**
+- **O quê:** Descritor de textura local
+- **Como funciona:** 
+  1. Para cada pixel, compara com os 8 vizinhos
+  2. Gera código binário (0 se vizinho < pixel, 1 caso contrário)
+  3. Cria um histograma de padrões uniformes (descarta padrões ruidosos)
+- **Por quê:** Captura texturas (rugosidade, padrões finos) que diferenciam as notas
+- **Uniforme:** Mantém apenas padrões com transições suaves (menos ruído)
+
+**Por que essa combinação?**
+- HSV captura **cor** (o fator dominante: ~85% da importância)
+- S/V captura **luminosidade** (adaptação a condições variáveis)
+- Hough captura **geometria/bordas** (estrutura das notas)
+- LBP captura **textura** (padrões finos e detalhes)
+
+Essa diversidade torna o modelo robusto a variações de iluminação, ângulo e qualidade da câmera.
+
 ### Classificador
 
 - `RandomForestClassifier` (scikit-learn)
