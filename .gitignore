@@ -1,0 +1,34 @@
+# Ambiente virtual Python
+venv/
+.venv/
+env/
+
+# Credenciais e secrets
+.env
+.kaggle/
+kaggle.json
+
+# Dataset (baixar do Kaggle — ver README)
+dataset/
+
+# Bytecode Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# IDEs e sistema
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Logs e caches
+*.log
+.cache/
+.pytest_cache/

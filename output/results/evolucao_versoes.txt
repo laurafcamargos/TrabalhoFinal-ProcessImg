@@ -1,0 +1,181 @@
+EVOLUCAO DAS VERSOES DO CLASSIFICADOR
+Trabalho Final - SCC0251: Processamento de Imagens
+Classificacao de denominacoes de cedulas do Real (R$2 a R$200)
+
+Todas as acuracias abaixo foram medidas no mesmo conjunto de teste (273 imagens),
+independente do treinamento (6.497 imagens), com random_state=42 no Random Forest.
+
+
+================================================================================
+VERSAO 1 - MULTIPLOS DESCRITORES SEM SELECAO
+================================================================================
+
+Abordagem:
+  - Combinacao ampla de descritores de cor, textura e geometria
+  - Histograma HSV Hue como descritor principal
+  - Inclusao de outros descritores sem analise de relevancia
+  - Aproximadamente 256 features por imagem
+
+Pre-processamento:
+  - Apenas redimensionamento para 256 x 256 pixels
+
+Classificador:
+  - Random Forest
+
+Resultado:
+  - Acuracia: 23,4%
+
+Por que nao funcionou:
+  - Muitas features redundantes ou ruidosas para o problema
+  - Descritores geometricos isolados (ex.: proporcoes, momentos) pouco
+    discriminativos sem contexto da regiao da cedula
+  - Cor sozinha, sem complemento de textura e estrutura, nao separa bem
+    7 classes em fotos reais com fundo e iluminacao variados
+  - Overfitting ou diluicao do sinal util no espaco de features de alta
+    dimensao com informacao pouco relevante
+
+Aprendizado:
+  - Acumular descritores nao garante melhor desempenho
+  - E necessario entender quais caracteristicas diferenciam cada denominacao
+
+
+================================================================================
+VERSAO 2 - DESCRITORES AVANCADOS + OCR + OKLAB
+================================================================================
+
+Abordagem:
+  - Expansao do conjunto de features com espaco de cor Oklab
+  - OCR (Tesseract) para leitura de texto na imagem
+  - Combinacao com histogramas HSV existentes
+  - Aproximadamente 561 features por imagem
+
+Pre-processamento:
+  - Redimensionamento para 256 x 256 pixels
+
+Classificador:
+  - Random Forest
+
+Resultado:
+  - Acuracia: 23,1%
+
+Por que nao funcionou:
+  - OCR em fotos de celular produz texto incorreto ou incompleto (angulo,
+    reflexo, fonte estilizada da cedula, numero nem sempre visivel)
+  - Texto extraido virou feature ruidosa em vez de discriminativa
+  - Oklab, sem selecao cuidadosa de bins, nao agregou informacao alem do HSV
+  - Novamente: mais features levou a desempenho equivalente ao acaso
+    ajustado (~14% seria chute aleatorio em 7 classes)
+
+Aprendizado:
+  - Informacao semantica (valor impresso) parece util, mas exige pipeline
+    dedicado (recorte da regiao do numero, binarizacao), nao OCR generico
+  - Espacos de cor alternativos precisam de justificativa e validacao empirica
+
+
+================================================================================
+VERSAO 3 - PIPELINE BALANCEADO (HSV + HOUGH + LBP)
+================================================================================
+
+Abordagem:
+  - Selecao deliberada de tres familias de descritores complementares:
+      * HSV Hue (180 bins)        - cor dominante de cada denominacao
+      * Hough Lines (5 features)  - padrao de linhas de seguranca
+      * LBP uniforme (59 bins)    - textura local
+  - Total: 244 features por imagem
+
+Pre-processamento:
+  - Apenas redimensionamento para 256 x 256 pixels
+
+Classificador:
+  - Random Forest (300 arvores, max_depth=15)
+
+Resultado:
+  - Acuracia: 67,77%
+
+Por que funcionou:
+  - Cada descritor captura um aspecto distinto: cor, textura e geometria linear
+  - HSV separa bem denominacoes de paletas distintas (R$5 roxo, R$100 azul,
+    R$2 vermelho)
+  - LBP complementa quando cores sao proximas, usando padroes de textura
+  - Hough agrega informacao estrutural sem exigir segmentacao previa
+  - Dimensionalidade reduzida (244) evita diluicao do sinal em relacao as
+    versoes com 500+ features
+
+Limitacoes identificadas:
+  - R$50 com recall baixo (~37%): confusao com outras cores azuis/vermelhas
+  - R$20 moderado (~53%): laranja proximo de vermelho (R$2)
+  - Histograma de Hue sensivel a pixels de sombra e fundo na imagem inteira
+
+
+================================================================================
+EXPERIMENTO ADICIONAL - PRE-PROCESSAMENTO E SEGMENTACAO (NAO ADOTADO)
+================================================================================
+
+Abordagem:
+  - Bilateral filter, CLAHE, segmentacao por contornos (Canny e mascara de cor)
+  - Mesmos descritores da Versao 3
+
+Resultados obtidos:
+  - Segmentacao simples: 65,20%
+  - Segmentacao com validacao e fallback: 60,44%
+
+Por que foi descartado:
+  - Recortes incorretos em fotos com fundo complexo degradam as features
+  - Custo computacional elevado (~50 min vs ~7 min por execucao)
+  - Acuracia inferior a simplesmente redimensionar a imagem
+
+
+================================================================================
+VERSAO FINAL ADOTADA - REFINAMENTO DA VERSAO 3
+================================================================================
+
+Arquivos:
+  - main.py
+  - src/descriptors.py
+  - src/preprocessing.py (apenas build_hue_mask utilizado)
+
+Abordagem:
+  - Mantem Hough e LBP da Versao 3
+  - Refina descritores de cor:
+      * Histograma de Hue com mascara de pixels confiaveis (S>30, V>40)
+      * Histogramas de Saturacao e Valor (32 bins cada)
+      * Normalizacao L1 dos histogramas
+  - Total: 308 features por imagem
+
+Pre-processamento:
+  - Redimensionamento para 256 x 256 pixels (sem segmentacao)
+
+Classificador:
+  - Random Forest (300 arvores, max_depth=15, min_samples_split=5)
+  - class_weight='balanced' para mitigar desbalanceamento entre classes
+
+Resultado:
+  - Acuracia: 69,60%
+
+Por que esta e a versao final:
+  - Melhor acuracia obtida em todo o desenvolvimento (+1,8 p.p. sobre V3)
+  - Recall de R$50 melhorou (37% para 47%) com histogramas S/V e pesos
+    balanceados
+  - Custo computacional baixo (~7 min), sem pre-processamento pesado
+  - Pipeline modular (descriptors.py, preprocessing.py) e reproduzivel
+  - Mantem foco em tecnicas classicas de Processamento de Imagens, alinhado
+    ao escopo da disciplina e da proposta do projeto
+
+
+================================================================================
+RESUMO COMPARATIVO
+================================================================================
+
+  Versao                          Features    Acuracia (teste)
+  ------------------------------  ----------  ----------------
+  V1 - Multiplos descritores      ~256        23,4%
+  V2 - Oklab + OCR                ~561        23,1%
+  V3 - HSV + Hough + LBP          244         67,8%
+  Pre-processamento + segmentacao   244         60,4%
+  FINAL - V3 refinada             308         69,6%
+
+Conclusao:
+  A evolucao de ~23% para ~70% decorreu da selecao de descritores complementares
+  e da eliminacao de abordagens que introduziam ruido (OCR, segmentacao falha,
+  excesso de features). A versao final equilibra desempenho, interpretabilidade
+  e custo computacional.

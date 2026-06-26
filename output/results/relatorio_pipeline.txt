@@ -1,0 +1,215 @@
+RELATORIO TECNICO - PIPELINE DE CLASSIFICACAO DE CEDULAS
+Trabalho Final - SCC0251: Processamento de Imagens
+Arquivo principal: main.py
+
+================================================================================
+1. OBJETIVO
+================================================================================
+
+O script main.py implementa um classificador supervisionado para identificar
+automaticamente a denominacao de cedulas do Real brasileiro (R$2, R$5, R$10,
+R$20, R$50, R$100 e R$200) a partir de imagens fotografadas em condicoes reais
+(celular, variacao de iluminacao, angulo e fundo).
+
+A abordagem adotada combina tecnicas classicas de Processamento de Imagens
+para extracao de descritores, seguidas de classificacao com Random Forest.
+
+
+================================================================================
+2. ESTRUTURA DO DATASET
+================================================================================
+
+As imagens estao organizadas em:
+
+    dataset/train/   - conjunto de treinamento
+    dataset/test/    - conjunto de teste
+
+Cada subdiretorio corresponde a uma classe (ex.: nota-20, nota-50). O rotulo
+da amostra e obtido a partir do nome da pasta, removendo o prefixo "nota-".
+
+Convencao de avaliacao:
+  - O modelo e treinado exclusivamente com dataset/train/
+  - A acuracia e medida exclusivamente com dataset/test/
+  - O conjunto dataset/validation/ nao e utilizado pelo main.py atual
+
+Dimensoes aproximadas:
+  - Treinamento: 6.497 imagens
+  - Teste: 273 imagens
+  - Total de classes: 7
+
+
+================================================================================
+3. FLUXO DE PROCESSAMENTO (main.py)
+================================================================================
+
+O pipeline executa as seguintes etapas, em ordem sequencial:
+
+  (1) Carregamento das imagens
+  (2) Redimensionamento para 256 x 256 pixels
+  (3) Extracao de descritores (modulo src/descriptors.py)
+  (4) Normalizacao das features (StandardScaler)
+  (5) Treinamento do classificador (Random Forest)
+  (6) Predicao e avaliacao no conjunto de teste
+  (7) Geracao de visualizacoes (matriz de confusao e importancia de features)
+
+Nao ha segmentacao nem pre-processamento pesado no pipeline final. A unica
+transformacao geometrica aplicada antes da extracao de descritores é o
+redimensionamento com interpolacao padrao do OpenCV.
+
+
+================================================================================
+4. EXTRACAO DE DESCRITORES (src/descriptors.py)
+================================================================================
+
+Cada imagem e converti
+da em um vetor de 308 atributos numericos, composto pela
+concatenacao dos descritores abaixo.
+
+4.1 Histograma do canal Hue (HSV) - 180 features
+    - Conversao BGR para HSV
+    - Calculo do histograma do canal H (0 a 180 graus) com 180 bins
+    - Aplicacao de mascara binaria para descartar pixels com baixa saturacao
+      ou baixo valor (S <= 30 ou V <= 40), nos quais o Hue e numericamente
+      instavel
+    - Normalizacao L1 do histograma (soma = 1)
+
+    Justificativa: as denominacoes possuem paletas de cores distintas. O espaco
+    HSV separa informacao de matiz da intensidade luminosa, conferindo maior
+    robustez a variacoes de iluminacao em relacao ao RGB.
+
+4.2 Histogramas de Saturacao e Valor (HSV) - 64 features
+    - 32 bins para o canal S (0 a 255)
+    - 32 bins para o canal V (0 a 255)
+    - Mesma mascara de pixels confiaveis utilizada no histograma de Hue
+    - Normalizacao L1 de cada histograma
+
+    Justificativa: auxilia na discriminacao entre classes com matizes
+    semelhantes (ex.: R$50 e R$100, ambas em tons de azul), capturando
+    diferencas de brilho e intensidade cromatica.
+
+4.3 Transformada de Hough (linhas) - 5 features
+    - Conversao para escala de cinza
+    - Deteccao de bordas (Canny, limiares 50 e 150)
+    - Transformada de Hough padrao (rho = 1 px, theta = 1 grau, threshold = 100)
+    - Features extraidas:
+        (i)   quantidade de linhas detectadas
+        (ii)  media dos angulos das linhas (graus)
+        (iii) desvio padrao dos angulos
+        (iv)  media do modulo de rho
+        (v)   desvio padrao de rho
+
+    Justificativa: as cedulas apresentam padroes de linhas de seguranca e
+    elementos graficos com orientacoes caracteristicas.
+
+4.4 Local Binary Patterns (LBP) - 59 features
+    - Conversao para escala de cinza
+    - LBP uniforme com 24 pontos e raio 3
+    - Histograma de 59 bins (padroes uniformes)
+    - Normalizacao L1
+
+    Justificativa: descreve textura local por comparacao relativa entre pixels
+    vizinhos, com relativa invariancia a mudancas monotonicas de intensidade.
+
+
+================================================================================
+5. NORMALIZACAO E CLASSIFICACAO
+================================================================================
+
+5.1 StandardScaler
+    Apos a extracao, os vetores de treino e teste sao padronizados (media zero
+    e variancia unitaria por feature). O scaler e ajustado (fit) somente no
+    conjunto de treinamento e aplicado (transform) no conjunto de teste, evitando
+    vazamento de informacao entre os conjuntos.
+
+5.2 Random Forest
+    Classificador: sklearn.ensemble.RandomForestClassifier
+
+    Hiperparametros:
+      - n_estimators = 300
+      - max_depth = 15
+      - min_samples_split = 5
+      - class_weight = 'balanced'
+      - random_state = 42
+
+    O parametro class_weight='balanced' ajusta automaticamente os pesos das
+    classes inversamente proporcionais a sua frequencia no treinamento,
+    mitigando o impacto de desbalanceamento entre denominacoes.
+
+
+================================================================================
+6. AVALIACAO E METRICAS
+================================================================================
+
+A avaliacao e realizada comparando as predicoes do modelo (y_pred) com os
+rotulos reais do conjunto de teste (y_test), por meio das funcoes do
+scikit-learn:
+
+  - accuracy_score: acuracia global (proporcao de classificacoes corretas)
+  - classification_report: precisao, recall e F1-score por classe
+  - confusion_matrix: matriz de confusao 7x7
+
+A acuracia e impressa no terminal ao final da execucao. Nao e um valor fixo
+no codigo: e recalculada a cada execucao com base nas predicoes correntes.
+
+Saida textual (terminal):
+  - Numero de amostras em treino e teste
+  - Dimensionalidade do vetor de features (308)
+  - Acuracia global
+  - Relatorio de classificacao por denominacao
+
+Saida grafica (diretorio output/visualizations/):
+  - confusion_matrix_balanced.png: matriz de confusao
+  - feature_importance_balanced.png: dez descritores de maior importancia
+    segundo o criterio de impureza do Random Forest (Gini)
+
+
+================================================================================
+7. ARQUITETURA DO CODIGO
+================================================================================
+
+main.py
+  Orquestra o pipeline completo: carga de dados, extracao, treinamento,
+  avaliacao e visualizacao.
+
+src/descriptors.py
+  Implementa as funcoes de extracao de descritores (HSV, Hough, LBP).
+
+src/preprocessing.py
+  Modulo auxiliar com funcoes de pre-processamento e segmentacao. Utilizado
+  parcialmente por descriptors.py (funcao build_hue_mask). As rotinas de
+  segmentacao completa foram experimentadas separadamente e nao integram o
+  pipeline final por apresentarem desempenho inferior na avaliacao.
+
+
+================================================================================
+8. EXPERIMENTOS COMPLEMENTARES (CONTEXTO)
+================================================================================
+
+Durante o desenvolvimento, outras abordagens foram testadas e descartadas no
+pipeline principal:
+
+  - Classificacao apenas com descritores HSV: acuracia aproximada de 23%
+  - Combinacao com OCR e espaco Oklab: acuracia aproximada de 23%
+  - Apenas Transformada de Hough: acuracia aproximada de 20%
+  - Pre-processamento com segmentacao por contornos e CLAHE: acuracia entre
+    60% e 65%, inferior a abordagem sem segmentacao
+
+A versao final prioriza descritores de cor, textura e geometria leve, sem
+recorte automatico da cedula, por apresentar melhor generalizacao no conjunto
+de teste com menor custo computacional.
+
+
+================================================================================
+9. EXECUCAO
+================================================================================
+
+Comando:
+
+    source venv/bin/activate
+    python main.py
+
+Dependencias principais: OpenCV, NumPy, scikit-image, scikit-learn, matplotlib,
+seaborn, tqdm.
+
+Tempo estimado de execucao: aproximadamente 7 a 8 minutos em ambiente padrao,
+sendo a extracao de descritores a etapa de maior custo.
