@@ -22,6 +22,10 @@ As imagens utilizadas neste projeto foram obtidas do dataset público no Kaggle:
 
 ## Abordagem
 
+### Pipeline do Sistema
+
+![Pipeline de Classificação](docs/pipeline.png)
+
 ### Pré-processamento e Extração de Descritores
 
 Cada imagem é redimensionada para 256×256 pixels e submetida a um pipeline de extração de 308 atributos numéricos. Os descritores foram selecionados para capturar características específicas das cédulas em diferentes condições de iluminação e ângulo de captura:
