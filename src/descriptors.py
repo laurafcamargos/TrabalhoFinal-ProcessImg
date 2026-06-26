@@ -12,7 +12,14 @@ import cv2
 import numpy as np
 from skimage.feature import local_binary_pattern
 
-from src.preprocessing import build_hue_mask
+
+def build_hue_mask(img, sat_min=30, val_min=40):
+    """
+    Máscara de pixels com cor confiável para histograma HSV.
+    Ignora regiões escuras ou pouco saturadas onde o Hue é instável.
+    """
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    return ((hsv[:, :, 1] > sat_min) & (hsv[:, :, 2] > val_min)).astype(np.uint8) * 255
 
 
 def extract_hue_histogram(img, bins=180):

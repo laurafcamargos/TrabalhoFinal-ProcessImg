@@ -213,13 +213,18 @@ negligible_count = np.sum(importances < threshold)
 negligible_pct = 100 * negligible_count / len(importances)
 useful_features = 308 - negligible_count
 
+# Calcula features negligenciáveis (apenas para informação)
+threshold = np.mean(importances[np.argsort(importances)[-20:]]) / 5
+negligible_count = np.sum(importances < threshold)
+negligible_pct = 100 * negligible_count / len(importances)
+
 print(f"\nResultados Finais:")
 print(f"   Acurácia geral: {overall_acc*100:.1f}%")
 print(f"   Melhor denominação: R${classes[np.argmax(accuracies)]} ({max(accuracies):.1f}%)")
 print(f"   Pior denominação: R${classes[np.argmin(accuracies)]} ({min(accuracies):.1f}%)")
-print(f"   Features usadas: 308 (Hue 180 + S/V 64 + Hough 5 + LBP 59)")
+print(f"   Features: 308 (Hue 180 + S/V 64 + Hough 5 + LBP 59)")
 print(f"   Features negligenciáveis: {negligible_count} ({negligible_pct:.1f}%)")
-print(f"   Features úteis: {useful_features} ({100-negligible_pct:.1f}%)")
+print(f"   Features úteis: {308 - negligible_count} ({100-negligible_pct:.1f}%)")
 print(f"\nGraficos salvos em output/visualizations/")
 print(f"   - confusion_matrix.png")
 print(f"   - accuracy_per_denomination.png")
