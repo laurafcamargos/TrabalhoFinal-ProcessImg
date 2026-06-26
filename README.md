@@ -1,201 +1,122 @@
-# Detector de Cédulas Falsas - Processamento de Imagens
+# Classificacao de Cedulas do Real
 
-**Trabalho Final - SCC0251: Processamento de Imagens**
+Trabalho Final — SCC0251: Processamento de Imagens
 
-## 🎯 Objetivo
+## Alunos -  Grupo AE
 
-Desenvolver um classificador para detectar cédulas falsas do Real utilizando **descritores de imagem** e **Random Forest**.
+- Gabriela dos Santos Amaral
+- Laura Fernandes Camargos
+- Vinicius Henrique Pereira Giroto
 
-Com dataset de **6.800+ imagens**, o projeto explora diferentes soluções e pode não chegar a 100% de acurácia (exploração também é válida).
+## Objetivo
 
-## 📊 Descritores Utilizados
+Desenvolver um classificador supervisionado que identifica automaticamente a denominacao de cedulas brasileiras (R$2, R$5, R$10, R$20, R$50, R$100 e R$200) a partir de fotografias reais adquiridas com camera de celular.
 
-### 1. **HSV Hue Histogram** (Cor)
-- Extrai o canal H (Hue) do espaço de cor HSV
-- **Por quê HSV e não RGB?**
-  - RGB muda completamente sob iluminação diferente (escuro, luz amarela)
-  - HSV separa cor pura (H) do brilho (V)
-- **Aplicação**: R$20 é laranja, R$100 é azul → diferenças de cor claras
-- **Tamanho**: 180 features (bins do histograma)
+O sistema utiliza descritores classicos de Processamento de Imagens e um classificador Random Forest.
 
-### 2. **LBP Histogram** (Textura)
-- Local Binary Patterns captura padrões de contraste local
-- **Por quê LBP?**
-  - Extremamente resistente a mudanças de iluminação
-  - Foca apenas em contraste entre pixels vizinhos
-  - Captura texturas: linhas de fundo, rosto, animais
-- **Diferencia**: textura de cédula genuína vs falsificação
-- **Tamanho**: 59 features (histograma LBP uniforme)
+## Abordagem
 
-### 3. **Hu Moments** (Geometria)
-- 7 momentos invariantes a rotação, escala e translação
-- **Por quê Hu Moments?**
-  - Se a cédula está de ponta-cabeça ou virada, os momentos permanecem iguais
-  - Captura forma geral independente de como é fotografada
-  - Log-normalizado para evitar overflow numérico
-- **Tamanho**: 7 features
+Cada imagem e redimensionada para 256x256 pixels e convertida em um vetor de 308 atributos numericos:
 
-### 4. **Aspect Ratio** (Proporção)
-- Largura / Altura da nota
-- **Por quê?**
-  - Cédulas de Real têm tamanhos diferentes por valor
-  - Proporção não muda com rotação/translação
-- **Tamanho**: 1 feature
+| Descritor | Features | Descricao |
+|-----------|----------|-----------|
+| HSV Hue | 180 | Histograma de matiz com mascara de pixels confiaveis |
+| HSV S/V | 64 | Histogramas de saturacao e valor (32 bins cada) |
+| Hough Lines | 5 | Estatisticas de linhas detectadas (Canny + Hough) |
+| LBP | 59 | Histograma de Local Binary Patterns uniforme |
 
-**Total de features**: 180 + 59 + 7 + 1 = **247 features**
+Os histogramas sao normalizados (L1). As features passam por `StandardScaler` antes do treinamento.
 
-## 🤖 Classificador
+### Classificador
 
-**Random Forest com 200 árvores**
-- Max depth: 20
-- Min samples split: 5
-- Min samples leaf: 2
+- `RandomForestClassifier` (scikit-learn)
+- 300 arvores, `max_depth=15`, `min_samples_split=5`
+- `class_weight='balanced'`
+- `random_state=42`
 
-Random Forest é escolhido porque:
-- Não requer normalização de features individuais
-- Robusto a outliers
-- Fornece feature importance
-- Eficiente com muitas features
+### Resultados
 
-## 📁 Estrutura
+- Conjunto de treino: 6.497 imagens (`dataset/train/`)
+- Conjunto de teste: 273 imagens (`dataset/test/`)
+- Acuracia no teste: aproximadamente **70%**
+
+Durante o desenvolvimento foram testadas outras abordagens (multiplos descritores sem selecao, OCR, segmentacao com pre-processamento pesado) com desempenho inferior. Detalhes em `output/results/evolucao_versoes.txt`.
+
+## Estrutura do projeto
 
 ```
-projeto_final/
-├── main.py                # Orquestrador principal
-├── requirements.txt       # Dependências
-├── README.md             # Este arquivo
+trabalho_AEX/
+├── main.py                      # Pipeline principal
+├── requirements.txt
+├── README.md
 ├── src/
-│   ├── __init__.py
-│   ├── data_loader.py        # Carregamento do Kaggle
-│   ├── descriptors.py        # Extração de descritores
-│   ├── classifier.py         # Random Forest + avaliação
-│   └── visualization.py      # Gráficos
+│   ├── descriptors.py           # Extracao de descritores
+│   └── preprocessing.py         # Funcoes auxiliares (mascara HSV; segmentacao experimental)
+├── dataset/                     # Nao versionado — ver secao Dataset
+│   ├── train/
+│   └── test/
 └── output/
-    ├── models/               # Modelos .pkl salvos
-    └── visualizations/       # PNG dos resultados
+    ├── visualizations/          # Matriz de confusao e feature importance
+    └── results/                 # Relatorios tecnicos (.txt)
 ```
 
-## 🚀 Como Usar
+## Como executar
 
-### 1. Preparar ambiente
+### 1. Ambiente virtual
+
 ```bash
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. Configurar Kaggle (uma única vez)
+### 2. Dataset
+
+O diretorio `dataset/` nao esta incluido no repositorio por seu tamanho (~8,6 GB).
+
+Baixe o dataset no Kaggle e organize as pastas `train/` e `test/` com subpastas por denominacao (`nota-2`, `nota-5`, ..., `nota-200`):
+
+https://www.kaggle.com/datasets/karenalmeida340/cdulas-do-real
+
+### 3. Executar o pipeline
+
 ```bash
-# Crie conta em https://www.kaggle.com
-# Vá em Account → API → Create New Token
-# Isso baixa kaggle.json
-
-# Coloque em:
-# Linux/Mac: ~/.kaggle/kaggle.json
-# Windows: C:\Users\<seu_usuario>\.kaggle\kaggle.json
-
-# Dê permissão (Linux/Mac):
-chmod 600 ~/.kaggle/kaggle.json
+python main.py
 ```
 
-### 3. Rodar pipeline
-```bash
-python3 main.py
-```
+O script ira:
 
-Na primeira execução, isso irá:
-1. Baixar dataset do Kaggle (6.8k imagens)
-2. Dividir em train (70%), val (15%), test (15%)
-3. Extrair descritores de todas as imagens
-4. Treinar Random Forest
-5. Avaliar na validação e teste
-6. Gerar visualizações e salvar modelo
+1. Carregar imagens de `dataset/train/` e `dataset/test/`
+2. Extrair descritores de cada imagem
+3. Treinar o Random Forest no conjunto de treino
+4. Avaliar no conjunto de teste (acuracia, classification report)
+5. Salvar graficos em `output/visualizations/`
 
-## 📈 Saídas Esperadas
+Tempo estimado de execucao: 7 a 8 minutos.
+
+## Saidas geradas
 
 ```
-output/
-├── models/
-│   └── banknote_detector.pkl      # Modelo treinado
-└── visualizations/
-    ├── sample_images.png           # Amostras do dataset
-    ├── class_distribution_train.png
-    ├── class_distribution_val.png
-    ├── class_distribution_test.png
-    ├── confusion_matrix_test.png   # Matriz de confusão
-    └── feature_importance.png      # Top 30 features
+output/visualizations/
+├── confusion_matrix_balanced.png
+└── feature_importance_balanced.png
+
+output/results/
+├── relatorio_pipeline.txt
+└── evolucao_versoes.txt
 ```
 
-## 🔍 Métricas de Avaliação
+## Metricas de avaliacao
 
-- **Acurácia**: Percentual total de predições corretas
-- **Precisão**: De todas as preditas como falsas, quantas realmente são
-- **Recall**: De todas as falsas, quantas foram detectadas
-- **F1-Score**: Média harmônica (precisão vs recall)
-- **Confusion Matrix**: Análise de erros por classe
-- **Feature Importance**: Quais features o modelo mais usa
+- **Acuracia**: proporcao de classificacoes corretas no conjunto de teste
+- **Precision / Recall / F1**: por denominacao (via `classification_report`)
+- **Matriz de confusao**: erros entre classes
+- **Feature importance**: relevancia de cada descritor no Random Forest
 
-## 🛠️ Modificações e Experimentos
-
-### Ajustar hiperparâmetros
-Em `src/classifier.py`:
-```python
-self.model = RandomForestClassifier(
-    n_estimators=300,   # ← aumentar/diminuir
-    max_depth=25,       # ← profundidade
-    # ...
-)
-```
-
-### Adicionar novos descritores
-Em `src/descriptors.py`, implemente em `BanknoteDescriptorExtractor`:
-```python
-def extract_meu_descritor(self, img):
-    # Extrai sua feature
-    return features
-```
-
-E adicione ao método `extract_all_descriptors()`.
-
-### Usar classificador diferente
-Crie nova classe em `src/classifier.py` herdando de BaseClassifier.
-
-## 📝 Notas Importantes
-
-- **Dataset**: Automaticamente baixado do Kaggle (6.8k imagens)
-- **Tempo**: Primeira execução leva tempo (download + extração de descritores)
-- **Memória**: Cuidado ao aumentar tamanho de imagem (padrão: 256x256)
-- **Reprodutibilidade**: Use `random_state=42` para resultados consistentes
-
-## 🚨 Troubleshooting
-
-### Erro: "ModuleNotFoundError: No module named 'kagglehub'"
-```bash
-pip install kagglehub
-```
-
-### Erro: "PermissionError" ao acessar kaggle.json
-```bash
-chmod 600 ~/.kaggle/kaggle.json
-```
-
-### Dataset não baixa
-1. Verifique conexão internet
-2. Verifique que kaggle.json está no lugar certo
-3. Tente em outro momento (servidor Kaggle pode estar lento)
-
-## 📚 Referências
+## Referencias
 
 - [HSV Color Space](https://en.wikipedia.org/wiki/HSL_and_HSV)
 - [Local Binary Patterns](https://en.wikipedia.org/wiki/Local_binary_patterns)
-- [Hu Moments](https://en.wikipedia.org/wiki/Image_moment)
+- [Hough Transform](https://en.wikipedia.org/wiki/Hough_transform)
 - [Random Forest](https://scikit-learn.org/stable/modules/ensemble.html#forest)
-- [Kaggle API](https://github.com/Kaggle/kagglehub)
-
-## 👥 Autores
-
-Trabalho Final - Processamento de Imagens (SCC0251)
-
----
-
-**Obs**: O projeto foca em exploração de soluções. Nem todas as ideias funcionam, e tudo bem. Isso também é uma entrega válida! 🎓
+- [Dataset Kaggle — Cedulas do Real](https://www.kaggle.com/datasets/karenalmeida340/cdulas-do-real)
