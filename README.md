@@ -14,6 +14,14 @@ Desenvolver um classificador supervisionado que identifica automaticamente a den
 
 O sistema utiliza descritores classicos de Processamento de Imagens e um classificador Random Forest.
 
+## Fonte dos dados
+
+As imagens utilizadas neste projeto foram obtidas do dataset publico no Kaggle:
+
+**[Cedulas do Real — karenalmeida340](https://www.kaggle.com/datasets/karenalmeida340/cdulas-do-real)**
+
+O dataset contem fotografias de cedulas brasileiras (R$2 a R$200) capturadas em condicoes reais, com variacao de iluminacao, angulo e fundo. O diretorio `dataset/` nao e versionado neste repositorio; e necessario baixar os arquivos manualmente pelo link acima.
+
 ## Abordagem
 
 Cada imagem e redimensionada para 256x256 pixels e convertida em um vetor de 308 atributos numericos:
@@ -72,11 +80,11 @@ pip install -r requirements.txt
 
 ### 2. Dataset
 
-O diretorio `dataset/` nao esta incluido no repositorio por seu tamanho (~8,6 GB).
+O diretorio `dataset/` nao esta incluido no repositorio devido ao tamanho (~8,6 GB).
 
-Baixe o dataset no Kaggle e organize as pastas `train/` e `test/` com subpastas por denominacao (`nota-2`, `nota-5`, ..., `nota-200`):
+Baixe o dataset em: https://www.kaggle.com/datasets/karenalmeida340/cdulas-do-real
 
-https://www.kaggle.com/datasets/karenalmeida340/cdulas-do-real
+Organize as pastas `train/` e `test/` com subpastas por denominacao (`nota-2`, `nota-5`, ..., `nota-200`).
 
 ### 3. Executar o pipeline
 
